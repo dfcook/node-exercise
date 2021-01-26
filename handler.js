@@ -1,5 +1,10 @@
+const R = require('ramda');
+
 const handler = (event, context) => {
-  return JSON.parse(event.body)
+  const json = JSON.parse(event.body)
+  return {
+    ORDERS: R.filter(o => o.OMS_ORDER_ID  === o.O_ID, json.ORDERS)
+  }
 }
 
 module.exports = handler
