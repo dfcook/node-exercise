@@ -14,20 +14,28 @@ describe('Handler', () => {
   it('Parses the event data into JSON', () => {
     const data = handler(event, context)
 
-    const { ORDERS: orders } = data
-    expect(Array.isArray(orders)).toBe(true);
+    const { CANCELLATIONS: cancellations, FULFILMENTS: fulfilments } = data
+    expect(Array.isArray(cancellations)).toBe(true)
+    expect(Array.isArray(fulfilments)).toBe(true)
 
-    const [order] = orders
+    const [order] = fulfilments
     expect(order.O_ID).toEqual('12345')
   })
 
   it('Filters out irrelevant orders', () => {
     const data = handler(event, context)
 
-    const { ORDERS: orders } = data
-    expect(orders.length).toEqual(2)
+    const { CANCELLATIONS: cancellations, FULFILMENTS: fulfilments } = data
 
-    const [order] = orders
-    expect(order.O_ID).toEqual('12345')
+    expect(cancellations.length + fulfilments.length).toEqual(2)
+  })
+
+  it('Splits orders into cancellations and fulfilments', () => {
+    const data = handler(event, context)
+
+    const { CANCELLATIONS: cancellations, FULFILMENTS: fulfilments } = data
+
+    expect(cancellations.length).toEqual(1)
+    expect(fulfilments.length).toEqual(1)
   })
 })
