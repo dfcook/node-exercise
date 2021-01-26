@@ -1,12 +1,38 @@
 const R = require('ramda');
 
-const handler = (event, context) => {
-  const json = JSON.parse(event.body)
-  const relevantOrders = R.filter(o => o.OMS_ORDER_ID === o.O_ID, json.ORDERS)
+const success = (fulfilments, cancellations) => ({
+  SUCCESS: true,
+  CANCELLATIONS: cancellations,
+  FULFILMENTS: fulfilments
+})
 
-  return {
-    CANCELLATIONS: R.filter(o => R.all(li => li.QUANTITY === '0', o.ORDER_LINES), relevantOrders),
-    FULFILMENTS: R.filter(o => R.any(li => li.QUANTITY !== '0', o.ORDER_LINES), relevantOrders),
+const fail = (msg) => ({
+  SUCCESS: false,
+  ERROR_MSG: msg
+})
+
+const handler = (event, context) => {
+  try {
+    if (!event) {
+      return fail('Empty event payload received')
+    }
+
+    const body = JSON.parse(event.body)
+
+    if (!body) {
+      return fail('No body in event payload')
+    }
+
+    if (!body.ORDERS) {
+      return fail('No orders in event body')
+    }
+
+    const relevantOrders = R.filter(o => o.OMS_ORDER_ID === o.O_ID, body.ORDERS)
+
+    const split = R.partition(o => R.any(li => li.QUANTITY !== '0', o.ORDER_LINES), relevantOrders)
+    return success(split[0], split[1])
+  } catch (e) {
+    return fail(e.message)
   }
 }
 
