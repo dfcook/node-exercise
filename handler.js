@@ -6,12 +6,18 @@ const { pick } = require('stream-json/filters/Pick')
 const { parser } = require('stream-json')
 const { streamArray } = require('stream-json/streamers/StreamArray')
 
-const handler = (event, { onCancellation, onFulfilment }) => {
+const handler = (event, context) => {
   return new Promise((resolve, reject) => {
     try {
       if (!event || !event.body) {
-        reject('Empty event payload received')
+        reject(new Error('Empty event payload received'))
       }
+
+      if (!context) {
+        reject(new Error('No contextual information received'))
+      }
+
+      const { onCancellation, onFulfilment } = context
 
       const pipeline = chain([
         event.body,
@@ -37,8 +43,9 @@ const handler = (event, { onCancellation, onFulfilment }) => {
           }
         })
         .on('finish', () => resolve())
+        .on('error', (err) => reject(err))
     } catch (e) {
-      reject(e.message)
+      reject(e)
     }
   })
 }
