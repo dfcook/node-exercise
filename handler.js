@@ -1,39 +1,46 @@
-const R = require('ramda');
+const R = require('ramda')
 
-const success = (fulfilments, cancellations) => ({
-  SUCCESS: true,
-  CANCELLATIONS: cancellations,
-  FULFILMENTS: fulfilments
-})
+const { chain } = require('stream-chain')
 
-const fail = (msg) => ({
-  SUCCESS: false,
-  ERROR_MSG: msg
-})
+const { pick } = require('stream-json/filters/Pick')
+const { parser } = require('stream-json')
+const { streamArray } = require('stream-json/streamers/StreamArray')
 
-const handler = (event, context) => {
-  try {
-    if (!event) {
-      return fail('Empty event payload received')
+const handler = (event, { onCancellation, onFulfilment }) => {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!event || !event.body) {
+        reject('Empty event payload received')
+      }
+
+      const pipeline = chain([
+        event.body,
+        parser(),
+        pick({ filter: 'ORDERS' }),
+        streamArray(),
+        ({ value }) => {
+          if (value.O_ID === value.OMS_ORDER_ID) {
+            return value
+          }
+        },
+      ])
+
+      pipeline
+        .on('data', (order) => {
+          if (
+            R.any((ol) => ol.QUANTITY !== '0', order.ORDER_LINES) &&
+            onFulfilment
+          ) {
+            onFulfilment(order)
+          } else if (onCancellation) {
+            onCancellation(order)
+          }
+        })
+        .on('finish', () => resolve())
+    } catch (e) {
+      reject(e.message)
     }
-
-    const body = JSON.parse(event.body)
-
-    if (!body) {
-      return fail('No body in event payload')
-    }
-
-    if (!body.ORDERS) {
-      return fail('No orders in event body')
-    }
-
-    const relevantOrders = R.filter(o => o.OMS_ORDER_ID === o.O_ID, body.ORDERS)
-
-    const split = R.partition(o => R.any(li => li.QUANTITY !== '0', o.ORDER_LINES), relevantOrders)
-    return success(split[0], split[1])
-  } catch (e) {
-    return fail(e.message)
-  }
+  })
 }
 
 module.exports = handler
